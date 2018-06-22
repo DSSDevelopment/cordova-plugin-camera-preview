@@ -1,0 +1,5 @@
+repositories {
+  maven { url 'https://jitpack.io' }
+}
+ 
+implementation 'io.fotoapparat.fotoapparat:library:2.2.0'
