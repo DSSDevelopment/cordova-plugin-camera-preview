@@ -1,5 +1,7 @@
 repositories {
   maven { url 'https://jitpack.io' }
 }
- 
-compile 'io.fotoapparat.fotoapparat:library:2.2.0'
+
+dependencies {
+  compile 'io.fotoapparat.fotoapparat:library:2.2.0'
+}
