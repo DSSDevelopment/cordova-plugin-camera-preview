@@ -30,7 +30,12 @@ import java.io.IOException;
 import java.lang.Exception;
 import java.lang.Integer;
 import java.util.List;
-import java.util.Arrays;
+
+import io.fotoapparat.Fotoapparat;
+import io.fotoapparat.parameter.ScaleType;
+import io.fotoapparat.result.BitmapPhoto;
+import io.fotoapparat.result.PhotoResult;
+import io.fotoapparat.view.CameraView;
 
 import static android.hardware.Camera.Parameters.FOCUS_MODE_AUTO;
 import static android.hardware.Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE;
@@ -38,6 +43,17 @@ import static android.hardware.Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO;
 import static android.hardware.Camera.Parameters.FOCUS_MODE_EDOF;
 import static android.hardware.Camera.Parameters.FOCUS_MODE_FIXED;
 import static android.hardware.Camera.Parameters.FOCUS_MODE_MACRO;
+import static io.fotoapparat.log.LoggersKt.logcat;
+import static io.fotoapparat.selector.AspectRatioSelectorsKt.standardRatio;
+import static io.fotoapparat.selector.FlashSelectorsKt.autoFlash;
+import static io.fotoapparat.selector.FlashSelectorsKt.autoRedEye;
+import static io.fotoapparat.selector.FlashSelectorsKt.torch;
+import static io.fotoapparat.selector.FocusModeSelectorsKt.autoFocus;
+import static io.fotoapparat.selector.FocusModeSelectorsKt.continuousFocusPicture;
+import static io.fotoapparat.selector.FocusModeSelectorsKt.fixed;
+import static io.fotoapparat.selector.LensPositionSelectorsKt.back;
+import static io.fotoapparat.selector.ResolutionSelectorsKt.highestResolution;
+import static io.fotoapparat.selector.SelectorsKt.firstAvailable;
 
 public class CameraActivity extends Fragment {
 
@@ -58,7 +74,9 @@ public class CameraActivity extends Fragment {
   private CameraPreviewListener eventListener;
   private static final String TAG = "PP/CameraActivity";
 
-  private Preview mPreview;
+  private CameraView cameraView;
+  private Fotoapparat fotoapparat;
+
   private boolean canTakePicture = true;
 
   public ViewGroup containerView;
@@ -93,7 +111,29 @@ public class CameraActivity extends Fragment {
   public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
     containerView = container;
     // video view
-    mPreview = new Preview(getActivity());
+    cameraView = new CameraView(getActivity());
+
+    fotoapparat = Fotoapparat
+      .with(getActivity())
+      .into(cameraView)           // view which will draw the camera preview
+      .photoResolution(standardRatio(highestResolution()))   // we want to have the biggest photo possible
+      .previewResolution(standardRatio(highestResolution()))
+      .previewScaleType(ScaleType.CenterCrop)  // we want the preview to fill the view
+      .lensPosition(back())       // we want back camera
+      .focusMode(firstAvailable(  // (optional) use the first focus mode which is supported by device
+        continuousFocusPicture(),
+        autoFocus(),        // in case if continuous focus is not available on device, auto focus will be used
+        fixed()             // if even auto focus is not available - fixed focus mode will be used
+      ))
+      .logger(logcat())
+      .flash(firstAvailable(      // (optional) similar to how it is done for focus mode, this time for flash
+        autoRedEye(),
+        autoFlash(),
+        torch()
+      ))
+      .build();
+
+
     Log.d(TAG, "add PreviewView to containerView");
     containerView.setEnabled(false);
 
@@ -101,7 +141,7 @@ public class CameraActivity extends Fragment {
       this.setupTouchAndBackButton();
     }
 
-    return mPreview;
+    return cameraView;
   }
 
   @Override
@@ -111,26 +151,28 @@ public class CameraActivity extends Fragment {
 
   private void initCamera(int cameraId, Parameters cameraParameters) {
 
-    if (mCamera != null) {
-      if (cameraId == cameraCurrentlyLocked) {
-        Log.d(TAG, "initCamera: requested camera is already init");
-        return;
-      }
-      Log.d(TAG, "initCamera: a Camera is already init stop it before continue");
-      stopCurrentCamera();
-    }
+    fotoapparat.start();
 
-    Log.d(TAG, "initCamera: Open camera " + cameraId);
-
-    mCamera = Camera.open(cameraId);
-    if (cameraParameters != null) {
-      setCameraParameters(cameraParameters);
-    }
-
-    cameraCurrentlyLocked = cameraId;
-    setBestFocusMode();
-    setPreviewSizeFromCameraPictureSize();
-    mPreview.setCamera(mCamera);
+//    if (mCamera != null) {
+//      if (cameraId == cameraCurrentlyLocked) {
+//        Log.d(TAG, "initCamera: requested camera is already init");
+//        return;
+//      }
+//      Log.d(TAG, "initCamera: a Camera is already init stop it before continue");
+//      stopCurrentCamera();
+//    }
+//
+//    Log.d(TAG, "initCamera: Open camera " + cameraId);
+//
+//    mCamera = Camera.open(cameraId);
+//    if (cameraParameters != null) {
+//      setCameraParameters(cameraParameters);
+//    }
+//
+//    cameraCurrentlyLocked = cameraId;
+//    setBestFocusMode();
+//    setPreviewSizeFromCameraPictureSize();
+    // mPreview.setCamera(mCamera);
 
   }
 
@@ -140,7 +182,7 @@ public class CameraActivity extends Fragment {
     }
 
     mCamera.stopPreview();
-    mPreview.setCamera(null);
+    // mPreview.setCamera(null);
     mCamera.release();
     mCamera = null;
   }
@@ -434,6 +476,44 @@ public class CameraActivity extends Fragment {
     }
   }
 
+
+  class RotateBitmapIfNecessary extends AsyncTask<Bitmap, String, String> {
+    @Override
+    protected String doInBackground(Bitmap[] params) {
+
+      Bitmap bitmap = params[0];
+
+      try {
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.JPEG, currentQuality, outputStream);
+        byte[] data = outputStream.toByteArray();
+
+        String encodedImage = Base64.encodeToString(data, Base64.NO_WRAP);
+
+        eventListener.onPictureTaken(encodedImage);
+        Log.d(TAG, "CameraPreview pictureTakenHandler called back");
+
+      } catch (OutOfMemoryError e)
+
+      {
+        // most likely failed to allocate memory for rotateBitmap
+        Log.d(TAG, "CameraPreview OutOfMemoryError");
+        // failed to allocate memory
+        eventListener.onPictureTakenError("Picture too large (memory)");
+      } catch (Exception e)
+
+      {
+        Log.d(TAG, "CameraPreview onPictureTaken general exception");
+      } finally
+
+      {
+        canTakePicture = true;
+        return null;
+      }
+    }
+  }
+
   public void setPictureSize(final int width, final int height) {
 
     Parameters params = mCamera.getParameters();
@@ -447,89 +527,55 @@ public class CameraActivity extends Fragment {
   public void takePicture(final int quality) {
     Log.d(TAG, "CameraPreview takePicture quality: " + quality);
 
-    if (mPreview != null) {
-      if (!canTakePicture) {
-        return;
-      }
+    PhotoResult photoResult = fotoapparat.takePicture();
+  try {
+    BitmapPhoto photo = photoResult
+      .toBitmap()
+      .await();
 
-      canTakePicture = false;
+    new RotateBitmapIfNecessary().execute(photo.bitmap);
+  } catch (Exception e) {
+    throw new RuntimeException(e);
+  }
 
-      new Thread() {
-        public void run() {
-          Parameters params = mCamera.getParameters();
 
-          /*
-           * Camera.Size size = getOptimalPictureSize(width, height,
-           * params.getPreviewSize(), params.getSupportedPictureSizes());
-           * params.setPictureSize(size.width, size.height);
-           */
-          currentQuality = quality;
 
-          if (cameraCurrentlyLocked == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-            // The image will be recompressed in the callback
-            params.setJpegQuality(99);
-          } else {
-            params.setJpegQuality(quality);
-          }
-
-          setCameraParameters(params);
-          mCamera.takePicture(shutterCallback, null, jpegPictureCallback);
-        }
-      }.start();
-    } else {
-      canTakePicture = true;
-    }
+//    if (mPreview != null) {
+//      if (!canTakePicture) {
+//        return;
+//      }
+//
+//      canTakePicture = false;
+//
+//      new Thread() {
+//        public void run() {
+//          Parameters params = mCamera.getParameters();
+//
+//          /*
+//           * Camera.Size size = getOptimalPictureSize(width, height,
+//           * params.getPreviewSize(), params.getSupportedPictureSizes());
+//           * params.setPictureSize(size.width, size.height);
+//           */
+//          currentQuality = quality;
+//
+//          if (cameraCurrentlyLocked == Camera.CameraInfo.CAMERA_FACING_FRONT) {
+//            // The image will be recompressed in the callback
+//            params.setJpegQuality(99);
+//          } else {
+//            params.setJpegQuality(quality);
+//          }
+//
+//          setCameraParameters(params);
+//          mCamera.takePicture(shutterCallback, null, jpegPictureCallback);
+//        }
+//      }.start();
+//    } else {
+//      canTakePicture = true;
+//    }
   }
 
   public void setFocusArea(final int pointX, final int pointY, final AutoFocusCallback callback) {
-    if (mCamera != null) {
 
-      Parameters params = mCamera.getParameters();
-
-      if (params.getMaxNumFocusAreas() > 0) {
-        Rect tapArea = calculateTapArea(pointX, pointY, 1f);
-        Area area = new Area(tapArea, 1000);
-        params.setFocusAreas(Arrays.asList(area));
-      }
-
-      if (params.getMaxNumMeteringAreas() > 0) {
-        Rect meteringRect = calculateTapArea(pointX, pointY, 1.5f);
-        Area area = new Area(meteringRect, 1000);
-        params.setMeteringAreas(Arrays.asList(area));
-      }
-
-      String focusMode = getBestFocusModeForTouchFocus();
-      if (focusMode != null) {
-        params.setFocusMode(focusMode);
-      }
-
-      try {
-        setCameraParameters(params);
-        mCamera.autoFocus(callback);
-      } catch (Exception e) {
-        Log.d(TAG, e.getMessage());
-        callback.onAutoFocus(false, this.mCamera);
-      }
-    }
-  }
-
-  private Rect calculateTapArea(float x, float y, float coefficient) {
-    if (x < 100) {
-      x = 100;
-    }
-    if (x > mPreview.viewWidth - 100) {
-      x = mPreview.viewWidth - 100;
-    }
-    if (y < 100) {
-      y = 100;
-    }
-    if (y > mPreview.viewHeight - 100) {
-      y = mPreview.viewHeight - 100;
-    }
-    return new Rect(Math.round((x - 100) * 2000 / mPreview.viewWidth - 1000),
-        Math.round((y - 100) * 2000 / mPreview.viewHeight - 1000),
-        Math.round((x + 100) * 2000 / mPreview.viewWidth - 1000),
-        Math.round((y + 100) * 2000 / mPreview.viewHeight - 1000));
   }
 
   public void setPreviewSizeFromCameraPictureSize() {
@@ -538,44 +584,18 @@ public class CameraActivity extends Fragment {
 
     Size pictureSize = params.getPictureSize();
 
-    // Get pictureSize Ratio
-    mPreview.previewRatio = (double) pictureSize.width / pictureSize.height;
-    Log.d(TAG, "previewRatio " + mPreview.previewRatio);
-    getActivity().runOnUiThread(new Runnable() {
-      @Override
-      public void run() {
-        mPreview.requestLayout();
-      }
-    });
-
     // Get best preview size of the same ratio
     List<Size> supportedPreviewSizes = params.getSupportedPreviewSizes();
 
-    Size optimalPreviewSize = findBestPreviewSize(pictureSize, supportedPreviewSizes);
-
-    if (optimalPreviewSize != null) {
-      params.setPreviewSize(optimalPreviewSize.width, optimalPreviewSize.height);
-      setCameraParameters(params);
-      // Restart camera, otherwise it seems that new previewSize is not applied
-      mCamera.stopPreview();
-      mCamera.startPreview();
-    }
-  }
-
-  private Size findBestPreviewSize(Size pictureSize, List<Size> supportedPreviewSizes) {
-    Size optimalPreviewSize = null;
-
-    for (Size size : supportedPreviewSizes) {
-      double ratio = (double) size.width / size.height;
-      if (ratio == mPreview.previewRatio) {
-        if (optimalPreviewSize == null) {
-          optimalPreviewSize = size;
-        } else if ((double) size.height * size.width > (double) optimalPreviewSize.height * optimalPreviewSize.width) {
-          optimalPreviewSize = size;
-        }
-      }
-    }
-    return optimalPreviewSize;
+//    Size optimalPreviewSize = findBestPreviewSize(pictureSize, supportedPreviewSizes);
+//
+//    if (optimalPreviewSize != null) {
+//      params.setPreviewSize(optimalPreviewSize.width, optimalPreviewSize.height);
+//      setCameraParameters(params);
+//      // Restart camera, otherwise it seems that new previewSize is not applied
+//      mCamera.stopPreview();
+//      mCamera.startPreview();
+//    }
   }
 
   private void setBestFocusMode() {
