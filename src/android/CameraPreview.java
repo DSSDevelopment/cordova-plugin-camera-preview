@@ -22,6 +22,7 @@ import org.json.JSONObject;
 import org.json.JSONArray;
 import org.json.JSONException;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Arrays;
 
@@ -240,19 +241,12 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
     return true;
   }
 
-  private Camera getCameraInstance(int id) {
-
-    Camera camera = null;
-
-    try {
-      camera = Camera.open(id);
-    } catch (Exception e) {
-      Log.e("BeMyEyeCamera", "Err: Camera unavailable : " + e.toString());
-    }
+  private Camera getCameraInstance(int id)  {
+    Camera camera = Camera.open(id);
     return camera;
   }
 
-  private void getSupportedPictureSizes(CallbackContext callbackContext) {
+  private void getSupportedPictureSizes(CallbackContext callbackContext) throws JSONException {
     List<Camera.Size> supportedSizes = null;
 
     // TODO: change whole logic so that every method can be called even when camera
@@ -279,12 +273,8 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
       int h = size.height;
       int w = size.width;
       JSONObject jsonSize = new JSONObject();
-      try {
-        jsonSize.put("height", new Integer(h));
-        jsonSize.put("width", new Integer(w));
-      } catch (JSONException e) {
-        e.printStackTrace();
-      }
+      jsonSize.put("height", new Integer(h));
+      jsonSize.put("width", new Integer(w));
       sizes.put(jsonSize);
     }
     callbackContext.success(sizes);
@@ -541,7 +531,7 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
     }
   }
 
-  private void getExposureCompensationRange(CallbackContext callbackContext) {
+  private void getExposureCompensationRange(CallbackContext callbackContext) throws JSONException {
     if (!this.hasCamera(callbackContext)) {
       return;
     }
@@ -556,12 +546,8 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
       callbackContext.error("Exposure corection not supported");
     } else {
       JSONObject jsonExposureRange = new JSONObject();
-      try {
-        jsonExposureRange.put("min", new Integer(minExposureCompensation));
-        jsonExposureRange.put("max", new Integer(maxExposureCompensation));
-      } catch (JSONException e) {
-        e.printStackTrace();
-      }
+      jsonExposureRange.put("min", new Integer(minExposureCompensation));
+      jsonExposureRange.put("max", new Integer(maxExposureCompensation));
       callbackContext.success(jsonExposureRange);
     }
   }
@@ -943,7 +929,12 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
       public void onAutoFocus(boolean success, Camera camera) {
         if (success) {
           camera.cancelAutoFocus();
-          onFocusSet(pointX, pointY);
+          try {
+            onFocusSet(pointX, pointY);
+          }
+          catch(JSONException e){
+            callbackContext.error(e.toString());
+          }
         } else {
           onFocusSetError("fragment.setFocusArea() failed");
         }
@@ -951,17 +942,12 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
     });
   }
 
-  public void onFocusSet(final int pointX, final int pointY) {
+  public void onFocusSet(final int pointX, final int pointY) throws JSONException {
     Log.d(TAG, "Focus set, returning coordinates");
 
     JSONObject data = new JSONObject();
-    try {
-      data.put("x", pointX);
-      data.put("y", pointY);
-    } catch (JSONException e) {
-      Log.d(TAG, "onFocusSet failed to set output payload");
-    }
-
+    data.put("x", pointX);
+    data.put("y", pointY);
     PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, data);
     pluginResult.setKeepCallback(true);
     setFocusCallbackContext.sendPluginResult(pluginResult);
@@ -972,12 +958,16 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
     setFocusCallbackContext.error(message);
   }
 
-  private void switchCamera(CallbackContext callbackContext) {
+  private void switchCamera(CallbackContext callbackContext)  {
     if (!this.hasView(callbackContext)) {
       return;
     }
 
-    fragment.switchCamera();
+    try {
+      fragment.switchCamera();
+    } catch (IOException e) {
+      callbackContext.error(e.getMessage());
+    }
     setCameraRotation();
     callbackContext.success();
   }

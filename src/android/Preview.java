@@ -53,7 +53,7 @@ class Preview extends ViewGroup implements SurfaceHolder.Callback {
 
   }
 
-  public void setCamera(Camera camera) {
+  public void setCamera(Camera camera) throws IOException {
     if (mCamera == camera) { return; }
 
     //stopPreviewAndFreeCamera();
@@ -61,13 +61,7 @@ class Preview extends ViewGroup implements SurfaceHolder.Callback {
     mCamera = camera;
 
     if (camera != null) {
-
-      try {
-        mCamera.setPreviewDisplay(mHolder);
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-
+      mCamera.setPreviewDisplay(mHolder);
       // Important: Call startPreview() to start updating the preview
       // surface. Preview must be started before you can take a picture.
       mCamera.startPreview();
@@ -166,8 +160,8 @@ class Preview extends ViewGroup implements SurfaceHolder.Callback {
         mSurfaceView.setWillNotDraw(false);
         mCamera.setPreviewDisplay(holder);
       }
-    } catch (Exception exception) {
-      Log.e(TAG, "Exception caused by setPreviewDisplay()", exception);
+    } catch (IOException exception) {
+      throw(new RuntimeException(exception));
     }
   }
 
@@ -185,14 +179,8 @@ class Preview extends ViewGroup implements SurfaceHolder.Callback {
     Log.d(TAG, "surfaceChanged");
 
     if(mCamera != null) {
-      try {
-
-        requestLayout();
-        setCameraDisplayOrientation();
-
-      } catch (Exception exception) {
-        Log.e(TAG, "Exception caused by surfaceChanged()", exception);
-      }
+      requestLayout();
+      setCameraDisplayOrientation();
     }
   }
 

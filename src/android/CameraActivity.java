@@ -12,6 +12,7 @@ import android.hardware.Camera.Area;
 import android.hardware.Camera.AutoFocusCallback;
 import android.hardware.Camera.Parameters;
 import android.hardware.Camera.PictureCallback;
+import android.hardware.Camera.ShutterCallback;
 import android.hardware.Camera.Size;
 import android.os.Bundle;
 import android.util.Log;
@@ -22,6 +23,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.support.media.ExifInterface;
+
+import org.json.JSONException;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -45,7 +48,7 @@ public class CameraActivity extends Fragment {
 
     void onPictureTakenError(String message);
 
-    void onFocusSet(int pointX, int pointY);
+    void onFocusSet(int pointX, int pointY) throws JSONException;
 
     void onFocusSetError(String message);
 
@@ -108,7 +111,7 @@ public class CameraActivity extends Fragment {
     // No call for super(). Bug on API Level > 11.
   }
 
-  private void initCamera(int cameraId, Parameters cameraParameters) {
+  private void initCamera(int cameraId, Parameters cameraParameters) throws IOException {
 
     if (mCamera != null) {
       if (cameraId == cameraCurrentlyLocked) {
@@ -132,7 +135,7 @@ public class CameraActivity extends Fragment {
 
   }
 
-  private void stopCurrentCamera() {
+  private void stopCurrentCamera() throws IOException {
     if (mCamera == null) {
       return;
     }
@@ -279,8 +282,14 @@ public class CameraActivity extends Fragment {
     Log.d(TAG, "on Resume");
 
     if (mCamera == null) {
-      initCamera(defaultCameraId, currentCameraParameters);
+      try {
+        initCamera(defaultCameraId, currentCameraParameters);
+      }
+      catch(IOException e){
+        throw new RuntimeException(e);
+      }
       eventListener.onCameraStarted();
+
 
     }
 
@@ -295,7 +304,12 @@ public class CameraActivity extends Fragment {
     // Because the Camera object is a shared resource, it's very important to
     // release it when the activity is paused.
     if (mCamera != null) {
-      stopCurrentCamera();
+      try {
+        stopCurrentCamera();
+      }
+      catch(IOException e){
+        throw new RuntimeException(e);
+      }
     }
 
   }
@@ -304,7 +318,7 @@ public class CameraActivity extends Fragment {
     return mCamera;
   }
 
-  public void switchCamera() {
+  public void switchCamera() throws IOException {
     // check for availability of multiple cameras
     if (numberOfCameras == 1) {
       // There is only one camera available
@@ -313,13 +327,8 @@ public class CameraActivity extends Fragment {
       Log.d(TAG, "numberOfCameras: " + numberOfCameras);
 
       Log.d(TAG, "cameraCurrentlyLocked := " + Integer.toString(cameraCurrentlyLocked));
-      try {
-        newCamera = (cameraCurrentlyLocked + 1) % numberOfCameras;
-        Log.d(TAG, "cameraCurrentlyLocked new: " + cameraCurrentlyLocked);
-      } catch (Exception exception) {
-        Log.d(TAG, exception.getMessage());
-      }
-
+      newCamera = (cameraCurrentlyLocked + 1) % numberOfCameras;
+      Log.d(TAG, "cameraCurrentlyLocked new: " + cameraCurrentlyLocked);
       if (newCamera != cameraCurrentlyLocked) {
         currentCameraParameters = null;
         initCamera(newCamera, null);
@@ -339,6 +348,13 @@ public class CameraActivity extends Fragment {
   public static Bitmap applyMatrix(Bitmap source, Matrix matrix) {
     return Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), matrix, true);
   }
+
+  ShutterCallback shutterCallback = new ShutterCallback() {
+    public void onShutter() {
+      // do nothing, availability of this callback causes default system shutter sound
+      // to work
+    }
+  };
 
   private static int exifToDegrees(int exifOrientation) {
     if (exifOrientation == ExifInterface.ORIENTATION_ROTATE_90) {
@@ -412,13 +428,10 @@ public class CameraActivity extends Fragment {
       {
         Log.d(TAG, "CameraPreview IOException");
         eventListener.onPictureTakenError("IO Error when extracting exif");
-      } catch (Exception e)
-
-      {
+      } catch (Exception e){
+        eventListener.onPictureTakenError("CameraPreview onPictureTaken general exception" + e.getMessage());
         Log.d(TAG, "CameraPreview onPictureTaken general exception");
-      } finally
-
-      {
+      } finally {
         canTakePicture = true;
         return null;
       }
@@ -464,7 +477,7 @@ public class CameraActivity extends Fragment {
           }
 
           setCameraParameters(params);
-          mCamera.takePicture(null, null, jpegPictureCallback);
+          mCamera.takePicture(shutterCallback, null, jpegPictureCallback);
         }
       }.start();
     } else {
