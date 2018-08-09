@@ -462,7 +462,7 @@ public class CameraActivity extends Fragment {
           } else {
             params.setJpegQuality(quality);
           }
-
+          params.setRotation(mPreview.getDisplayOrientation());
           setCameraParameters(params);
           mCamera.takePicture(null, null, jpegPictureCallback);
         }
