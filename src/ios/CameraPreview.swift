@@ -24,7 +24,8 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
     // 7 options.toBack,
     // 8 options.alpha,
     // 9 options.tapFocus,
-    // 10 options.disableExifHeaderStripping]
+    // 10 options.disableExifHeaderStripping,
+    // 11 options.businessCardOverlay
     func startCamera(_ command: CDVInvokedUrlCommand) {
         print("--> startCamera")
         
@@ -60,6 +61,7 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
             let alpha = CGFloat((command.arguments[8] as? Int)!)
             let tapToFocus: Bool = (command.arguments[9] as? Int)! != 0
             let disableExifHeaderStripping: Bool = (command.arguments[10] as? Int)! != 0
+            let businessCardOverlay: Bool = (command.arguments[11] as? Int)! != 0
             
             DispatchQueue.main.async {
                 let x = (command.arguments[0] as? CGFloat ?? 0.0) + self.webView.frame.origin.x
@@ -94,6 +96,21 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
                 } else {
                     self.cameraRenderController.view.alpha = alpha
                     self.webView.superview?.insertSubview(self.cameraRenderController.view, aboveSubview: self.webView)
+                }
+
+                if businessCardOverlay {
+                  // add a view containing the business card overlay to the hierarchy on top of the video preview layer
+                  let margin: CGFloat = 30.0
+                  let height = self.cameraRenderController.view.frame.size.height - 256
+                  let overlayFrame: CGRect = CGRect(x: margin, y: margin / 2.0, width: self.cameraRenderController.view.frame.size.width - (margin * 2.0), height: height)
+                  let businessCardOverlayView = UIImageView(frame: overlayFrame)
+                  businessCardOverlayView.contentMode = .scaleAspectFit
+                  businessCardOverlayView.isOpaque = false
+                  businessCardOverlayView.backgroundColor = .clear
+                  if let image = UIImage(named: "bc-template-1-7.png") {
+                    businessCardOverlayView.image = image
+                    self.webView.superview?.insertSubview(businessCardOverlayView, aboveSubview: self.cameraRenderController.view)
+                  }
                 }
                 
                 // Setup session

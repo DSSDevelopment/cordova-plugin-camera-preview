@@ -19,7 +19,7 @@
     <source-file src="src/android/CustomSurfaceView.java" target-dir="src/com/cordovaplugincamerapreview" />
     <source-file src="src/android/Preview.java" target-dir="src/com/cordovaplugincamerapreview" />
     <source-file src="src/android/TapGestureDetector.java" target-dir="src/com/cordovaplugincamerapreview" />
-
+    <resource-file src="src/img/bc-template-1-7.png" target="res/drawable-hdpi/bc_template_1_7.png" />
     <resource-file src="src/android/camera_theme.xml" target="res/values/camera_theme.xml" />
 
     <framework src="com.android.support:exifinterface:25+" />
@@ -54,6 +54,7 @@
     <source-file src="src/ios/TemperatureAndTint.swift" />
     <source-file src="src/ios/CameraSessionManager.swift" />
     <source-file src="src/ios/CameraRenderController.swift" />
+    <resource-file src="src/img/bc-template-1-7.png" />
 
     <framework src="ImageIO.framework" weak="true" />
     <framework src="MobileCoreServices.framework" />

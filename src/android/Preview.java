@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.util.List;
 
 class Preview extends ViewGroup implements SurfaceHolder.Callback {
+  public int displayOrientation;
+
   private final String TAG = "PP/Preview";
 
   CustomSurfaceView mSurfaceView;
@@ -31,7 +33,6 @@ class Preview extends ViewGroup implements SurfaceHolder.Callback {
   double previewRatio;
   Camera mCamera;
   int cameraId;
-  int displayOrientation;
   int viewWidth;
   int viewHeight;
 
