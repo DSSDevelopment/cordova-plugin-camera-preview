@@ -75,6 +75,7 @@ public class CameraActivity extends Fragment {
   public boolean tapToFocus;
   public boolean disableExifHeaderStripping;
   public boolean toBack;
+  public boolean businessCardOverlay;
 
   public void setEventListener(CameraPreviewListener listener) {
     eventListener = listener;

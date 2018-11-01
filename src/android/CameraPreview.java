@@ -14,6 +14,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.widget.ImageView;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Arrays;
 
 import android.widget.RelativeLayout;
+import android.widget.FrameLayout;
 
 public class CameraPreview extends CordovaPlugin implements CameraActivity.CameraPreviewListener {
 
@@ -97,7 +99,7 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
       if (cordova.hasPermission(permissions[0])) {
         startCamera(args.getInt(0), args.getInt(1), args.getInt(2), args.getInt(3), args.getString(4),
             args.getBoolean(5), args.getBoolean(6), args.getBoolean(7), args.getString(8), args.getBoolean(9),
-            args.getBoolean(10), callbackContext);
+            args.getBoolean(10), args.getBoolean(11), callbackContext);
       } else {
         this.execCallback = callbackContext;
         this.execArgs = args;
@@ -214,7 +216,7 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
       startCamera(this.execArgs.getInt(0), this.execArgs.getInt(1), this.execArgs.getInt(2), this.execArgs.getInt(3),
           this.execArgs.getString(4), this.execArgs.getBoolean(5), this.execArgs.getBoolean(6),
           this.execArgs.getBoolean(7), this.execArgs.getString(8), this.execArgs.getBoolean(9),
-          this.execArgs.getBoolean(10), this.execCallback);
+          this.execArgs.getBoolean(10), this.execArgs.getBoolean(11), this.execCallback);
     }
   }
 
@@ -291,7 +293,7 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
   }
 
   private void startCamera(int x, int y, int width, int height, String defaultCamera, Boolean tapToTakePicture,
-      Boolean dragEnabled, final Boolean toBack, String alpha, boolean tapFocus, boolean disableExifHeaderStripping,
+      Boolean dragEnabled, final Boolean toBack, String alpha, boolean tapFocus, boolean disableExifHeaderStripping, boolean businessCardOverlay,
       CallbackContext callbackContext) {
     Log.d(TAG, "start camera action");
     if (fragment != null) {
@@ -309,6 +311,7 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
     fragment.tapToFocus = tapFocus;
     fragment.disableExifHeaderStripping = disableExifHeaderStripping;
     fragment.toBack = toBack;
+    fragment.businessCardOverlay = businessCardOverlay;
 
     DisplayMetrics metrics = cordova.getActivity().getResources().getDisplayMetrics();
     // offset
@@ -356,6 +359,20 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
           containerView.setAlpha(opacity);
           containerView.bringToFront();
 
+        }
+
+        if (businessCardOverlay) {
+          final int imageWidth = (int)(computedWidth * 0.7);
+          final int imageHeight = (int)(computedHeight * 0.5);
+          final ImageView imageView = new ImageView(cordova.getActivity().getApplicationContext());
+          final int resourceId = cordova.getActivity().getResources().getIdentifier("bc_template_1_7", "drawable", cordova.getActivity().getPackageName());
+          imageView.setImageResource(resourceId);
+          imageView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+          FrameLayout.LayoutParams imageLayoutParams = new FrameLayout.LayoutParams(imageWidth, imageHeight);
+          imageLayoutParams.setMargins(computedX + ((computedWidth - imageWidth) / 2), computedY + ((computedHeight - imageHeight) / 2), 0, 0);
+          ViewGroup webViewParentGroup = (ViewGroup) webView.getView().getParent();
+          webViewParentGroup.addView(imageView, 1, imageLayoutParams);
+          int index = webViewParentGroup.indexOfChild(imageView);
         }
 
         // add the fragment to the container
