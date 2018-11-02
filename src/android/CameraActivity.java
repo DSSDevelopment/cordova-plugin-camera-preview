@@ -547,7 +547,7 @@ public class CameraActivity extends Fragment {
     List<Size> supportedPreviewSizes = params.getSupportedPreviewSizes();
 
     Size optimalPreviewSize = findBestPreviewSize(pictureSize, supportedPreviewSizes);
-
+    Log.d(TAG, "Preview size: " + optimalPreviewSize);
     if (optimalPreviewSize != null) {
       params.setPreviewSize(optimalPreviewSize.width, optimalPreviewSize.height);
       setCameraParameters(params);
@@ -561,7 +561,7 @@ public class CameraActivity extends Fragment {
     Size optimalPreviewSize = null;
 
     for (Size size : supportedPreviewSizes) {
-      double ratio = (double) size.width / size.height;
+      double ratio = (double) size.height / size.width;
       if (ratio == mPreview.previewRatio) {
         if (optimalPreviewSize == null) {
           optimalPreviewSize = size;

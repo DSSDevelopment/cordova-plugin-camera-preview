@@ -362,14 +362,16 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
         }
 
         if (businessCardOverlay) {
-          final int imageWidth = (int)(computedWidth * 0.7);
-          final int imageHeight = (int)(computedHeight * 0.5);
+          final int margin = (int)(computedWidth * 0.3);
+          final int extraBottomMargin = (int)(computedHeight * 0.2);
+          final int imageWidth = computedWidth - margin;
+          final int imageHeight = computedHeight - margin - extraBottomMargin;
           final ImageView imageView = new ImageView(cordova.getActivity().getApplicationContext());
           final int resourceId = cordova.getActivity().getResources().getIdentifier("bc_template_1_7", "drawable", cordova.getActivity().getPackageName());
           imageView.setImageResource(resourceId);
           imageView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
           FrameLayout.LayoutParams imageLayoutParams = new FrameLayout.LayoutParams(imageWidth, imageHeight);
-          imageLayoutParams.setMargins(computedX + ((computedWidth - imageWidth) / 2), computedY + ((computedHeight - imageHeight) / 2), 0, 0);
+          imageLayoutParams.setMargins(computedX + (margin / 2), computedY + (margin / 2) + 64, 0, 0);
           ViewGroup webViewParentGroup = (ViewGroup) webView.getView().getParent();
           webViewParentGroup.addView(imageView, 1, imageLayoutParams);
           int index = webViewParentGroup.indexOfChild(imageView);

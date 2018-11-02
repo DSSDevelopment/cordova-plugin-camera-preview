@@ -77,12 +77,13 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
                 self.cameraRenderController.tapToFocus = tapToFocus
                 self.cameraRenderController.disableExifHeaderStripping = disableExifHeaderStripping
                 self.cameraRenderController.sessionManager = self.sessionManager
-                self.cameraRenderController.view.frame = CGRect(x: x, y: y, width: width, height: height)
+                self.cameraRenderController.view.frame = CGRect(x: x, y: y - 32, width: width == 0 ? UIScreen.main.bounds.width : width, height: height == 0 ? UIScreen.main.bounds.height :  height)
                 self.cameraRenderController.delegate = self
                 self.viewController.addChildViewController(self.cameraRenderController)
                 
                 // Add video preview layer
                 let previewLayer = AVCaptureVideoPreviewLayer(session: self.sessionManager?.session!)
+                previewLayer?.videoGravity = AVLayerVideoGravityResizeAspectFill
                 previewLayer?.frame = self.cameraRenderController.view.frame
                 self.cameraRenderController.view.layer.addSublayer(previewLayer!)
                 
@@ -101,7 +102,7 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
                 if businessCardOverlay {
                   // add a view containing the business card overlay to the hierarchy on top of the video preview layer
                   let margin: CGFloat = 30.0
-                  let height = self.cameraRenderController.view.frame.size.height - 256
+                  let height = self.cameraRenderController.view.frame.size.height - margin
                   let overlayFrame: CGRect = CGRect(x: margin, y: margin / 2.0, width: self.cameraRenderController.view.frame.size.width - (margin * 2.0), height: height)
                   let businessCardOverlayView = UIImageView(frame: overlayFrame)
                   businessCardOverlayView.contentMode = .scaleAspectFit
