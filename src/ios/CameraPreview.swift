@@ -12,6 +12,7 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
         // start as transparent
         webView.isOpaque = false
         webView.backgroundColor = UIColor.clear
+        self.captureVideoOrientation = .portrait
     }
 
     // 0 [options.x,
@@ -102,7 +103,7 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
                 if businessCardOverlay {
                   // add a view containing the business card overlay to the hierarchy on top of the video preview layer
                   let margin: CGFloat = 30.0
-                  let height = self.cameraRenderController.view.frame.size.height - margin
+                  let height = self.cameraRenderController.view.frame.size.height - (margin * 2)
                   let overlayFrame: CGRect = CGRect(x: margin, y: margin / 2.0, width: self.cameraRenderController.view.frame.size.width - (margin * 2.0), height: height)
                   let businessCardOverlayView = UIImageView(frame: overlayFrame)
                   businessCardOverlayView.contentMode = .scaleAspectFit
