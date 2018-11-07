@@ -134,17 +134,16 @@ class Preview extends ViewGroup implements SurfaceHolder.Callback {
     int nW = 0;
     int nH = 0;
 
-    if(parentHeight > parentWidth) {
-      nW = parentWidth;
-      nH = (int) Math.round(parentWidth * previewRatio);
-    }else{
+    //if(parentHeight > parentWidth) {
+    //  nW = parentWidth;
+    //  nH = (int) Math.round(parentWidth * previewRatio);
+    //}else{
       nW = (int) Math.round(parentHeight / previewRatio);
       nH = parentHeight;
-    }
+    //}
     viewHeight = nH;
     viewWidth = nW;
     setMeasuredDimension(nW, nH);
-
   }
 
   @Override

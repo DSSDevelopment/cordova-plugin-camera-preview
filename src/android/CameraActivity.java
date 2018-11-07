@@ -558,19 +558,41 @@ public class CameraActivity extends Fragment {
   }
 
   private Size findBestPreviewSize(Size pictureSize, List<Size> supportedPreviewSizes) {
-    Size optimalPreviewSize = null;
+    final int h = pictureSize.height;
+    final int w = pictureSize.width;
+    final double ASPECT_TOLERANCE = 0.1;
+    double targetRatio = (double) h / w;
+
+    if (supportedPreviewSizes == null)
+        return null;
+
+    Size optimalSize = null;
+    double minDiff = Double.MAX_VALUE;
+
+    int targetHeight = h;
 
     for (Size size : supportedPreviewSizes) {
-      double ratio = (double) size.height / size.width;
-      if (ratio == mPreview.previewRatio) {
-        if (optimalPreviewSize == null) {
-          optimalPreviewSize = size;
-        } else if ((double) size.height * size.width > (double) optimalPreviewSize.height * optimalPreviewSize.width) {
-          optimalPreviewSize = size;
+        double ratio = (double) size.height / size.width;
+        if (Math.abs(ratio - targetRatio) > ASPECT_TOLERANCE)
+            continue;
+
+        if (Math.abs(size.height - targetHeight) < minDiff) {
+            optimalSize = size;
+            minDiff = Math.abs(size.height - targetHeight);
         }
-      }
     }
-    return optimalPreviewSize;
+
+    if (optimalSize == null) {
+        minDiff = Double.MAX_VALUE;
+        for (Size size : supportedPreviewSizes) {
+            if (Math.abs(size.height - targetHeight) < minDiff) {
+                optimalSize = size;
+                minDiff = Math.abs(size.height - targetHeight);
+            }
+        }
+    }
+
+    return optimalSize;
   }
 
   private String getBestFocusModeForTouchFocus() {

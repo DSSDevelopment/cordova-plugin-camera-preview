@@ -313,6 +313,7 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
     fragment.toBack = toBack;
     fragment.businessCardOverlay = businessCardOverlay;
 
+    final int softKeyBar = 84;
     DisplayMetrics metrics = cordova.getActivity().getResources().getDisplayMetrics();
     // offset
     final int computedX = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, x, metrics);
@@ -320,7 +321,7 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
 
     // size
     final int computedWidth = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, width, metrics);
-    final int computedHeight = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, height, metrics);
+    final int computedHeight = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, height - softKeyBar, metrics);
 
     startCameraCallbackContext = callbackContext;
 
@@ -334,7 +335,7 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
           containerView = new RelativeLayout(cordova.getActivity().getApplicationContext());
           containerView.setId(containerViewId);
 
-          containerView.setGravity(Gravity.CENTER);
+          containerView.setGravity(Gravity.FILL_VERTICAL);
           RelativeLayout.LayoutParams containerLayoutParams = new RelativeLayout.LayoutParams(computedWidth,
               computedHeight);
           containerLayoutParams.setMargins(computedX, computedY, 0, 0);
@@ -362,16 +363,16 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
         }
 
         if (businessCardOverlay) {
-          final int margin = (int)(computedWidth * 0.3);
-          final int extraBottomMargin = (int)(computedHeight * 0.2);
-          final int imageWidth = computedWidth - margin;
-          final int imageHeight = computedHeight - margin - extraBottomMargin;
+          final int height = (int)(computedHeight * 0.9);
+          final int width = (int)(height * .588);
+          final int topMargin = (computedHeight + computedY - height) / 2;
+          final int sideMargin = (computedWidth + computedX - width) / 2;
           final ImageView imageView = new ImageView(cordova.getActivity().getApplicationContext());
           final int resourceId = cordova.getActivity().getResources().getIdentifier("bc_template_1_7", "drawable", cordova.getActivity().getPackageName());
           imageView.setImageResource(resourceId);
           imageView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-          FrameLayout.LayoutParams imageLayoutParams = new FrameLayout.LayoutParams(imageWidth, imageHeight);
-          imageLayoutParams.setMargins(computedX + (margin / 2), computedY + (margin / 2) + 64, 0, 0);
+          FrameLayout.LayoutParams imageLayoutParams = new FrameLayout.LayoutParams(width, height);
+          imageLayoutParams.setMargins(sideMargin, topMargin, 0, 0);
           ViewGroup webViewParentGroup = (ViewGroup) webView.getView().getParent();
           webViewParentGroup.addView(imageView, 1, imageLayoutParams);
           int index = webViewParentGroup.indexOfChild(imageView);
