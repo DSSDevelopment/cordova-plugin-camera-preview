@@ -28,23 +28,12 @@ extension UIColor {
 
 @objc(BlurDetector)
 class BlurDetector: NSObject {
-    let gridSize: CGFloat = 10
+    let gridSize: CGFloat = 50
     
     public func detectBlur(image: UIImage) -> Float {
-      var processedImage = image
+      let processedImage = image
       var maxContrast: CGFloat = 0.0
       var maxContrastLocation = CGPoint(x: 0, y: 0)
-
-      if image.size.width > 1000 || image.size.height > 1000 {
-        let scaleFactor = 1000 / image.size.width > image.size.height ? image.size.width : image.size.height
-        let newSize = CGSize(width: image.size.width * scaleFactor, height: image.size.height * scaleFactor)
-        UIGraphicsBeginImageContext(newSize)
-        image.draw(in: CGRect(x: 0, y: 0, width: newSize.width, height: newSize.height))
-        if let newImage = UIGraphicsGetImageFromCurrentImageContext() {
-          processedImage = newImage
-        }
-        UIGraphicsEndImageContext()
-      }
       
       for i in stride(from: gridSize / 2, to: processedImage.size.width - (gridSize / 2), by: gridSize) {
           var brightness = perceptualBrightness(image: processedImage, point: CGPoint(x: i, y: gridSize / 2))
@@ -75,6 +64,7 @@ class BlurDetector: NSObject {
       for x in Int(maxContrastLocation.x - 4)...Int(maxContrastLocation.x + 4) {
           for y in Int(maxContrastLocation.y - 4)...Int(maxContrastLocation.y + 4) {
               let brightness = perceptualBrightness(image: processedImage, point: CGPoint(x: x, y: y))
+            print(brightness)
               if brightness > maxV {
                   maxV = brightness
               }
@@ -83,9 +73,10 @@ class BlurDetector: NSObject {
               }
           }
       }
-      
-      let sharpness = (maxContrast / (15 + maxV - minV)) * 27000.0 / 255.0
-      return Float(sharpness)
+        let offset: Float = 15.0
+        let contrastCoefficient = Float(maxContrast) / (offset + Float(maxV) - Float(minV))
+        let sharpness: Float = contrastCoefficient * 27000.0 / 255.0
+        return sharpness
     }
     
     private func perceptualBrightness(image: UIImage, point: CGPoint) -> CGFloat {

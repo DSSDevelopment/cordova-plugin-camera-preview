@@ -827,13 +827,15 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
                     }
                     
                     // Export to Base64
-                    var params = [AnyHashable]()
+                    var params = [AnyHashable: Any]()
                     let base64Image = self.getBase64Image(finalImage!, withQuality: quality)
-                    params.append(base64Image!)
+                    params["image"] = base64Image!
 
+
+                    // Apply blur detection
                     if self.cameraRenderController.blurDetection {
                       let sharpness = self.blurDetector?.detectBlur(image: finalImage!)
-                      params.append(sharpness)
+                      params["sharpness"] =  sharpness!
                     }
                     
                     let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: params)
