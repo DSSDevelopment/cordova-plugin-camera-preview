@@ -7,6 +7,7 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
     var cameraRenderController: CameraRenderController!
     var onPictureTakenHandlerId = ""
     var captureVideoOrientation: AVCaptureVideoOrientation?
+    var blurDetector: BlurDetector?
     
     override func pluginInitialize() {
         // start as transparent
@@ -26,7 +27,8 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
     // 8 options.alpha,
     // 9 options.tapFocus,
     // 10 options.disableExifHeaderStripping,
-    // 11 options.businessCardOverlay
+    // 11 options.businessCardOverlay,
+    // 12 options.blurDetection
     func startCamera(_ command: CDVInvokedUrlCommand) {
         print("--> startCamera")
         
@@ -63,6 +65,7 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
             let tapToFocus: Bool = (command.arguments[9] as? Int)! != 0
             let disableExifHeaderStripping: Bool = (command.arguments[10] as? Int)! != 0
             let businessCardOverlay: Bool = (command.arguments[11] as? Int)! != 0
+            let blurDetection: Bool = (command.arguments[12] as? Int)! != 0
             
             DispatchQueue.main.async {
                 let x = (command.arguments[0] as? CGFloat ?? 0.0) + self.webView.frame.origin.x
@@ -70,6 +73,8 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
                 
                 // Create the session manager
                 self.sessionManager = CameraSessionManager()
+
+                self.blurDetector = BlurDetector()
                 
                 // Render controller setup
                 self.cameraRenderController = CameraRenderController()
@@ -78,6 +83,7 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
                 self.cameraRenderController.tapToFocus = tapToFocus
                 self.cameraRenderController.disableExifHeaderStripping = disableExifHeaderStripping
                 self.cameraRenderController.sessionManager = self.sessionManager
+                self.cameraRenderController.blurDetection = blurDetection
                 self.cameraRenderController.view.frame = CGRect(x: x, y: y, width: width == 0 ? UIScreen.main.bounds.width : width, height: height == 0 ? UIScreen.main.bounds.height :  height)
                 self.cameraRenderController.delegate = self
                 self.viewController.addChildViewController(self.cameraRenderController)
@@ -824,6 +830,11 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
                     var params = [AnyHashable]()
                     let base64Image = self.getBase64Image(finalImage!, withQuality: quality)
                     params.append(base64Image!)
+
+                    if self.cameraRenderController.blurDetection {
+                      let sharpness = self.blurDetector?.detectBlur(image: finalImage!)
+                      params.append(sharpness)
+                    }
                     
                     let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: params)
                     pluginResult?.setKeepCallbackAs(true)

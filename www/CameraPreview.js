@@ -32,7 +32,8 @@ CameraPreview.startCamera = function (options, onSuccess, onError) {
   }
   options.disableExifHeaderStripping = options.disableExifHeaderStripping || false;
   options.businessCardOverlay = options.businessCardOverlay || false;
-  exec(onSuccess, onError, PLUGIN_NAME, "startCamera", [options.x, options.y, options.width, options.height, options.camera, options.tapPhoto, options.previewDrag, options.toBack, options.alpha, options.tapFocus, options.disableExifHeaderStripping, options.businessCardOverlay]);
+  options.blurDetection = options.blurDetection || false;
+  exec(onSuccess, onError, PLUGIN_NAME, "startCamera", [options.x, options.y, options.width, options.height, options.camera, options.tapPhoto, options.previewDrag, options.toBack, options.alpha, options.tapFocus, options.disableExifHeaderStripping, options.businessCardOverlay, options.blurDetection]);
 };
 
 CameraPreview.stopCamera = function (onSuccess, onError) {
