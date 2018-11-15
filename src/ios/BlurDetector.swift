@@ -13,7 +13,26 @@ extension UIImage {
         let a = CGFloat(data[pixelInfo+3]) / CGFloat(255.0)
         return UIColor(red: r, green: g, blue: b, alpha: a)
     }
+
+    public func getPixelGrayscaleValue(pos: CGPoint) -> CGFloat {
+      var grayscale: CGFloat = 0.0
+      var alpha: CGFloat = 0.0
+     self.getPixelColor(pos: pos).getWhite(&grayscale, alpha: &alpha)
+     return grayscale
+    }
+
+    var mono: UIImage? {
+      let context = CIContext(options: nil)
+      guard let currentFilter = CIFilter(name: "CIPhotoEffectMono") else { return nil }
+      currentFilter.setValue(CIImage(image: self), forKey: kCIInputImageKey)
+      if let output = currentFilter.outputImage, let cgImage = context.createCGImage(output, from: output.extent) {
+        return UIImage(cgImage: cgImage, scale: scale, orientation: imageOrientation)
+      }
+      return nil
+    }
 }
+
+
 
 extension UIColor {
     public func rgbComponents() -> (CGFloat, CGFloat, CGFloat) {
@@ -28,60 +47,100 @@ extension UIColor {
 
 @objc(BlurDetector)
 class BlurDetector: NSObject {
-    let gridSize: CGFloat = 50
+    private let gridSize: CGFloat = 50
+    private let lapMatrix: [[CGFloat]] = [[0, 1, 0], [1, -4, 1], [0, 1, 0]]
     
-    public func detectBlur(image: UIImage) -> Float {
+    public func detectBlur(image: UIImage, completion: @escaping (_: Float) -> ()) {
       let processedImage = image
-      var maxContrast: CGFloat = 0.0
-      var maxContrastLocation = CGPoint(x: 0, y: 0)
-      
-      for i in stride(from: gridSize / 2, to: processedImage.size.width - (gridSize / 2), by: gridSize) {
-          var brightness = perceptualBrightness(image: processedImage, point: CGPoint(x: i, y: gridSize / 2))
-          for j in stride(from: (gridSize / 2) + 1.0, to: processedImage.size.height - (gridSize / 2), by: 1) {
-              let comparativeBrightness = perceptualBrightness(image: processedImage, point: CGPoint(x: i, y: j))
-              if maxContrast < abs(comparativeBrightness - brightness) {
-                  maxContrast = abs(comparativeBrightness - brightness)
-                  maxContrastLocation = CGPoint(x: i, y: j)
-              }
-              brightness = comparativeBrightness
-          }
+      if let monoImage = processedImage.mono {
+        laplacian(image: monoImage) { (variance) in
+            print("overall variance: \(variance)")
+            completion(Float(variance))
+        }
+      } else {
+        completion(0.0)
       }
-      
-      for i2 in stride(from: gridSize / 2, to: processedImage.size.height - (gridSize / 2), by: gridSize) {
-          var brightness = perceptualBrightness(image: processedImage, point: CGPoint(x: gridSize / 2, y: i2))
-          for j2 in stride(from: (gridSize / 2) + 1, to: processedImage.size.width - (gridSize / 2), by: 1) {
-              let comparativeBrightness = perceptualBrightness(image: processedImage, point: CGPoint(x: j2, y: i2))
-              if maxContrast < abs(comparativeBrightness - brightness) {
-                  maxContrast = abs(comparativeBrightness - brightness)
-                  maxContrastLocation = CGPoint(x: j2, y: i2)
-              }
-              brightness = comparativeBrightness
-          }
+    }
+
+    private func laplacian(image: UIImage, completion: @escaping  (_: CGFloat) -> ()) {
+      let pixelData = image.cgImage!.dataProvider!.data
+      let data: UnsafePointer<UInt8> = CFDataGetBytePtr(pixelData)
+        
+      let tileMatrixEdgeSize = 3
+      let tileEdgeSize = 100 * tileMatrixEdgeSize > Int(image.size.width) ? Int(image.size.width) / tileMatrixEdgeSize : 100
+      let tileOriginX = (Int(image.size.width) / 2) - ((tileMatrixEdgeSize * tileEdgeSize) / 2)
+      let tileOriginY = (Int(image.size.height) / 2) - ((tileMatrixEdgeSize * tileEdgeSize) / 2)
+      var tiles = [CGRect]()
+      for i in 0..<tileMatrixEdgeSize {
+        for j in 0..<tileMatrixEdgeSize {
+          tiles.append(CGRect(x: (i * tileEdgeSize) + tileOriginX, y: (j * tileEdgeSize) + tileOriginY, width: tileEdgeSize, height: tileEdgeSize))
+        }
       }
-      
-      var maxV: CGFloat = 0.0
-      var minV: CGFloat = 255.0
-      for x in Int(maxContrastLocation.x - 4)...Int(maxContrastLocation.x + 4) {
-          for y in Int(maxContrastLocation.y - 4)...Int(maxContrastLocation.y + 4) {
-              let brightness = perceptualBrightness(image: processedImage, point: CGPoint(x: x, y: y))
-            print(brightness)
-              if brightness > maxV {
-                  maxV = brightness
-              }
-              if brightness < minV {
-                  minV = brightness
-              }
-          }
+
+      var tileResults = [CGFloat]()
+      let tilingQueue = DispatchQueue(label: "com.dogesystemstudios.gcd.laplacian", attributes: [DispatchQueue.Attributes.concurrent], target: .global())
+      let callbackQueue = DispatchQueue(label: "com.dogesystemstudios.gcd.callback", attributes: [])
+      let tilingGroup = DispatchGroup()
+      for tile in tiles {
+        tilingGroup.enter()
+        tilingQueue.async(group: tilingGroup) {
+          self.convolveSingleTile(image: image, rawImageData: data, tile: tile, completion: { tileVariance in
+            callbackQueue.sync() {
+              tileResults.append(tileVariance)
+            }
+          tilingGroup.leave()
+          })
+        }
       }
-        let offset: Float = 15.0
-        let contrastCoefficient = Float(maxContrast) / (offset + Float(maxV) - Float(minV))
-        let sharpness: Float = contrastCoefficient * 27000.0 / 255.0
-        return sharpness
+      tilingGroup.notify(queue: .main) {
+          print("Done convoluting tiles.")
+          let averageVariance = tileResults.reduce(0.0, {x, y in x + y}) / CGFloat(tileResults.count)
+          completion(averageVariance)
+      }
+    }
+
+    private func convolveSingleTile(image: UIImage, rawImageData: UnsafePointer<UInt8>, tile: CGRect, completion: (_: CGFloat) -> ()) {
+      var sum: CGFloat = 0.0
+      var values = [CGFloat]()
+      var r: CGFloat = 0.0
+      var g: CGFloat = 0.0
+      var b: CGFloat = 0.0
+      var a: CGFloat = 0.0
+      var grayscale: CGFloat = 0.0
+      var alpha: CGFloat = 0.0
+      var pos: CGPoint = CGPoint.zero
+      var pixelInfo = 0
+
+      for x in Int(tile.origin.x)..<Int(tile.origin.x + tile.size.width) {
+        for y in Int(tile.origin.y)..<Int(tile.origin.y + tile.size.height) {
+          let rejectEdgePixel = x - 1 < 0 || x + 2 > Int(image.size.width) || y - 1 < 0 || y + 2 > Int(image.size.height)
+          if (!rejectEdgePixel) { 
+            var accumulator: CGFloat = 0.0
+            for i in 0..<3 {
+              for j in 0..<3 {
+                pos = CGPoint(x: x+i-1, y: y+j-1)
+                pixelInfo = ((Int(image.size.width) * Int(pos.y)) + Int(pos.x)) * 4
+                r = CGFloat(rawImageData[pixelInfo]) / CGFloat(255.0)
+                g = CGFloat(rawImageData[pixelInfo+1]) / CGFloat(255.0)
+                b = CGFloat(rawImageData[pixelInfo+2]) / CGFloat(255.0)
+                a = CGFloat(rawImageData[pixelInfo+3]) / CGFloat(255.0)
+                UIColor(red: r, green: g, blue: b, alpha: a).getWhite(&grayscale, alpha: &alpha)
+                accumulator += grayscale * lapMatrix[i][j]
+              }
+            }
+            sum += accumulator
+            values.append(accumulator)
+          }
+        }
+      }
+      let average: Float = Float(sum == 0 ? 1 : sum) / Float(values.count)
+      let variance = values.reduce(CGFloat(0.0), {acc, val in acc + pow((val - CGFloat(average)), 2)})
+      completion(variance)
     }
     
     private func perceptualBrightness(image: UIImage, point: CGPoint) -> CGFloat {
-        let colorComponents = image.getPixelColor(pos: point).rgbComponents()
-        let perceptualBrightness: CGFloat = floor(0.35 * (colorComponents.0 * 255.0) + 0.5 * (colorComponents.1 * 255.0) + 0.15 * (colorComponents.2 * 255.0))
-        return perceptualBrightness
+      let colorComponents = image.getPixelColor(pos: point).rgbComponents()
+      let perceptualBrightness: CGFloat = floor(0.35 * colorComponents.0 + 0.5 * colorComponents.1 + 0.15 * colorComponents.2)
+      return perceptualBrightness
     }
 }

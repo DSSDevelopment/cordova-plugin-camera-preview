@@ -71,6 +71,10 @@ CameraPreview.takePicture = function (opts, onSuccess, onError) {
   exec(onSuccess, onError, PLUGIN_NAME, "takePicture", [opts.quality]);
 };
 
+CameraPreview.calculatePictureBlur = function (imageData, onSuccess, onError) {
+  exec(onSuccess, onError, PLUGIN_NAME, "calculatePictureBlur", [imageData])
+};
+
 CameraPreview.setColorEffect = function (effect, onSuccess, onError) {
   exec(onSuccess, onError, PLUGIN_NAME, "setColorEffect", [effect]);
 };

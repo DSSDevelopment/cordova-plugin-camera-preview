@@ -772,6 +772,23 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
         }
     }
 
+  func calculatePictureBlur(_ command: CDVInvokedUrlCommand) {
+    if let imageData = command.arguments[0] as? String {
+      if let decodedData = Data(base64Encoded: imageData.components(separatedBy: ",")[1]) {
+        if let image = UIImage(data: decodedData) {
+          commandDelegate.run(inBackground: {() -> Void in
+            self.blurDetector?.detectBlur(image: image, completion: { variance in
+              var params = [AnyHashable]()
+              params.append(variance)
+              let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: params)
+              pluginResult?.setKeepCallbackAs(true)
+              self.commandDelegate.send(pluginResult, callbackId: command.callbackId)
+            })
+          })
+        }
+      }
+    }
+  }
     
     func invokeTakePicture(withQuality quality: CGFloat) {
     
@@ -830,13 +847,6 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
                     var params = [AnyHashable: Any]()
                     let base64Image = self.getBase64Image(finalImage!, withQuality: quality)
                     params["image"] = base64Image!
-
-
-                    // Apply blur detection
-                    if self.cameraRenderController.blurDetection {
-                      let sharpness = self.blurDetector?.detectBlur(image: finalImage!)
-                      params["sharpness"] =  sharpness!
-                    }
                     
                     let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: params)
                     pluginResult?.setKeepCallbackAs(true)
