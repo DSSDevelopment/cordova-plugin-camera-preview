@@ -4,6 +4,8 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.hardware.Camera;
 import android.hardware.Camera.AutoFocusCallback;
@@ -29,7 +31,7 @@ import java.util.Arrays;
 import android.widget.RelativeLayout;
 import android.widget.FrameLayout;
 
-public class CameraPreview extends CordovaPlugin implements CameraActivity.CameraPreviewListener {
+public class CameraPreview extends CordovaPlugin implements CameraActivity.CameraPreviewListener, BlurDetection.BlurDetectorListener {
 
   private static final String TAG = "PP/CameraPreview";
 
@@ -46,6 +48,7 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
   private static final String STOP_CAMERA_ACTION = "stopCamera";
   private static final String PICTURE_SIZE_ACTION = "setPictureSize";
   private static final String SWITCH_CAMERA_ACTION = "switchCamera";
+  private static final String CALCULATE_BLUR_ACTION = "calculatePictureBlur";
   private static final String TAKE_PICTURE_ACTION = "takePicture";
   private static final String SHOW_CAMERA_ACTION = "showCamera";
   private static final String HIDE_CAMERA_ACTION = "hideCamera";
@@ -72,6 +75,7 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
 
   private CameraActivity fragment;
 
+  private CallbackContext calculatePictureBlurCallbackContext;
   private CallbackContext takePictureCallbackContext;
   private CallbackContext setFocusCallbackContext;
   private CallbackContext startCameraCallbackContext;
@@ -105,6 +109,9 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
         this.execArgs = args;
         cordova.requestPermissions(this, CAM_REQ_CODE, permissions);
       }
+      break;
+    case CALCULATE_BLUR_ACTION:
+      calculatePictureBlur(args.getString(0), callbackContext);
       break;
     case TAKE_PICTURE_ACTION:
       takePicture(args.getInt(0), callbackContext);
@@ -393,6 +400,24 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
     PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, "Camera started");
     pluginResult.setKeepCallback(true);
     startCameraCallbackContext.sendPluginResult(pluginResult);
+  }
+
+  private void calculatePictureBlur(String encodedImage, CallbackContext callbackContext) {
+    String imageBase64Data = encodedImage.substring(encodedImage.indexOf(",") + 1);
+    byte[] decodedString = Base64.decode(imageBase64Data, Base64.DEFAULT);
+    Bitmap decodedImage = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
+    calculatePictureBlurCallbackContext = callbackContext;
+    BlurDetection blurDetector = new BlurDetection();
+    blurDetector.setEventListener(this);
+    blurDetector.detectBlur(decodedImage);
+  }
+
+  public void onBlurCalculated(Double blur) {
+    JSONArray data = new JSONArray();
+    data.put(blur);
+    PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, data);
+    pluginResult.setKeepCallback(true);
+    calculatePictureBlurCallbackContext.sendPluginResult(pluginResult);
   }
 
   private void takePicture(int quality, CallbackContext callbackContext) {

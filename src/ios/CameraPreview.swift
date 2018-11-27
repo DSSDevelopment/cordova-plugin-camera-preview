@@ -844,9 +844,9 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
                     }
                     
                     // Export to Base64
-                    var params = [AnyHashable: Any]()
+                    var params = [AnyHashable]()
                     let base64Image = self.getBase64Image(finalImage!, withQuality: quality)
-                    params["image"] = base64Image!
+                    params.append(base64Image!)
                     
                     let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: params)
                     pluginResult?.setKeepCallbackAs(true)

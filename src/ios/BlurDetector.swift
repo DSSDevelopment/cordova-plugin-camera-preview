@@ -68,12 +68,14 @@ class BlurDetector: NSObject {
         
       let tileMatrixEdgeSize = 3
       let tileEdgeSize = 100 * tileMatrixEdgeSize > Int(image.size.width) ? Int(image.size.width) / tileMatrixEdgeSize : 100
-      let tileOriginX = (Int(image.size.width) / 2) - ((tileMatrixEdgeSize * tileEdgeSize) / 2)
-      let tileOriginY = (Int(image.size.height) / 2) - ((tileMatrixEdgeSize * tileEdgeSize) / 2)
+      let tileFormationSize = Int(image.size.width) < Int(image.size.height) ? Int(image.size.width * 0.2) : Int(image.size.height * 0.2)
+      let tileOriginStep = tileFormationSize / tileMatrixEdgeSize
+      let tileOriginX = (Int(image.size.width) / 2) - ((tileMatrixEdgeSize * tileOriginStep) / 2)
+      let tileOriginY = (Int(image.size.height) / 2) - ((tileMatrixEdgeSize * tileOriginStep) / 2)
       var tiles = [CGRect]()
       for i in 0..<tileMatrixEdgeSize {
         for j in 0..<tileMatrixEdgeSize {
-          tiles.append(CGRect(x: (i * tileEdgeSize) + tileOriginX, y: (j * tileEdgeSize) + tileOriginY, width: tileEdgeSize, height: tileEdgeSize))
+          tiles.append(CGRect(x: (i * tileOriginStep) + tileOriginX, y: (j * tileOriginStep) + tileOriginY, width: tileEdgeSize, height: tileEdgeSize))
         }
       }
 
