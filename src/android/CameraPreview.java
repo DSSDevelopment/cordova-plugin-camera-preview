@@ -47,6 +47,7 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
   private static final String SET_FLASH_MODE_ACTION = "setFlashMode";
   private static final String START_CAMERA_ACTION = "startCamera";
   private static final String STOP_CAMERA_ACTION = "stopCamera";
+  private static final String SET_OVERLAY_ORIENTATION_ACTION = "setOverlayOrientation";
   private static final String PICTURE_SIZE_ACTION = "setPictureSize";
   private static final String SWITCH_CAMERA_ACTION = "switchCamera";
   private static final String CALCULATE_BLUR_ACTION = "calculatePictureBlur";
@@ -86,6 +87,12 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
   private JSONArray execArgs;
 
   private ViewParent webViewParent;
+  private ImageView overlayView;
+  private boolean overlayOrientationChangeWithScreen;
+  private int computedHeight;
+  private int computedWidth;
+  private int computedX;
+  private int computedY;
 
   private int containerViewId = 20; // <- set to random number to prevent conflict with other plugins
 
@@ -104,12 +111,15 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
       if (cordova.hasPermission(permissions[0])) {
         startCamera(args.getInt(0), args.getInt(1), args.getInt(2), args.getInt(3), args.getString(4),
             args.getBoolean(5), args.getBoolean(6), args.getBoolean(7), args.getString(8), args.getBoolean(9),
-            args.getBoolean(10), args.getBoolean(11), callbackContext);
+            args.getBoolean(10), args.getBoolean(11), args.getBoolean(12), callbackContext);
       } else {
         this.execCallback = callbackContext;
         this.execArgs = args;
         cordova.requestPermissions(this, CAM_REQ_CODE, permissions);
       }
+      break;
+    case SET_OVERLAY_ORIENTATION_ACTION:
+      setOverlayOrientation(args.getString(0));
       break;
     case CALCULATE_BLUR_ACTION:
       calculatePictureBlur(args.getString(0), callbackContext);
@@ -224,7 +234,7 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
       startCamera(this.execArgs.getInt(0), this.execArgs.getInt(1), this.execArgs.getInt(2), this.execArgs.getInt(3),
           this.execArgs.getString(4), this.execArgs.getBoolean(5), this.execArgs.getBoolean(6),
           this.execArgs.getBoolean(7), this.execArgs.getString(8), this.execArgs.getBoolean(9),
-          this.execArgs.getBoolean(10), this.execArgs.getBoolean(11), this.execCallback);
+          this.execArgs.getBoolean(10), this.execArgs.getBoolean(11), this.execArgs.getBoolean(12), this.execCallback);
     }
   }
 
@@ -302,7 +312,7 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
 
   private void startCamera(int x, int y, int width, int height, String defaultCamera, Boolean tapToTakePicture,
       Boolean dragEnabled, final Boolean toBack, String alpha, boolean tapFocus, boolean disableExifHeaderStripping, boolean businessCardOverlay,
-      CallbackContext callbackContext) {
+      boolean overlayOrientationChangeWithScreen, CallbackContext callbackContext) {
     Log.d(TAG, "start camera action");
     if (fragment != null) {
       callbackContext.error("CameraAlreadyStarted");
@@ -324,12 +334,13 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
     final int softKeyBar = 84;
     DisplayMetrics metrics = cordova.getActivity().getResources().getDisplayMetrics();
     // offset
-    final int computedX = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, x, metrics);
-    final int computedY = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, y, metrics);
+    computedX = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, x, metrics);
+    computedY = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, y, metrics);
 
     // size
-    final int computedWidth = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, width, metrics);
-    final int computedHeight = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, height - softKeyBar, metrics);
+    computedWidth = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, width, metrics);
+    computedHeight = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, height - softKeyBar, metrics);
+    this.overlayOrientationChangeWithScreen = overlayOrientationChangeWithScreen;
 
     startCameraCallbackContext = callbackContext;
 
@@ -371,19 +382,7 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
         }
 
         if (businessCardOverlay) {
-          final int height = (int)(computedHeight * 0.9);
-          final int width = (int)(height * .588);
-          final int topMargin = (computedHeight + computedY - height) / 2;
-          final int sideMargin = (computedWidth + computedX - width) / 2;
-          final ImageView imageView = new ImageView(cordova.getActivity().getApplicationContext());
-          final int resourceId = cordova.getActivity().getResources().getIdentifier("bc_template_1_7", "drawable", cordova.getActivity().getPackageName());
-          imageView.setImageResource(resourceId);
-          imageView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-          FrameLayout.LayoutParams imageLayoutParams = new FrameLayout.LayoutParams(width, height);
-          imageLayoutParams.setMargins(sideMargin, topMargin, 0, 0);
-          ViewGroup webViewParentGroup = (ViewGroup) webView.getView().getParent();
-          webViewParentGroup.addView(imageView, 1, imageLayoutParams);
-          int index = webViewParentGroup.indexOfChild(imageView);
+          createBusinessCardOverlay();
         }
 
         // add the fragment to the container
@@ -394,6 +393,45 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
       }
     });
 
+  }
+
+  private void createBusinessCardOverlay() {
+    final int height = (int)(computedHeight * 0.9);
+    final int width = (int)(height * .588);
+    final int topMargin = (computedHeight + computedY - height) / 2;
+    final int sideMargin = (computedWidth + computedX - width) / 2;
+    overlayView = new ImageView(cordova.getActivity().getApplicationContext());
+    final int resourceId = cordova.getActivity().getResources().getIdentifier("bc_template_1_7", "drawable", cordova.getActivity().getPackageName());
+    overlayView.setImageResource(resourceId);
+    overlayView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+    FrameLayout.LayoutParams imageLayoutParams = new FrameLayout.LayoutParams(width, height);
+    imageLayoutParams.setMargins(sideMargin, topMargin, 0, 0);
+    ViewGroup webViewParentGroup = (ViewGroup) webView.getView().getParent();
+    webViewParentGroup.addView(overlayView, 1, imageLayoutParams);
+  }
+
+  public void setOverlayOrientation(String orientation) {
+    int height = (int)(computedHeight * 0.9);
+    final int width = (int)(height * .588);
+    final double aspectRatio = 9.0 / 16.0;
+    final int topMargin = (computedHeight + computedY - height) / 2;
+    final int sideMargin = (computedWidth + computedX - width) / 2;
+    String resourceName = orientation.equals("landscape") ? "bc_template_1_7_landscape" : "bc_template_1_7";
+    final int resourceId = cordova.getActivity().getResources().getIdentifier(resourceName, "drawable", cordova.getActivity().getPackageName());
+    if (orientation.equals("landscape")) {
+      height = (int)(width * aspectRatio);
+    }
+    ViewGroup.LayoutParams imageLayoutParams = overlayView.getLayoutParams();
+    imageLayoutParams.height = height;
+    imageLayoutParams.width = width;
+    // imageLayoutParams.setMargins(sideMargin, topMargin, 0, 0);
+    cordova.getActivity().runOnUiThread(new Runnable() {
+      @Override
+      public void run() {
+        overlayView.setImageResource(resourceId);
+        overlayView.setLayoutParams(imageLayoutParams);
+      }
+    });
   }
 
   public void onCameraStarted() {
@@ -775,6 +813,9 @@ public class CameraPreview extends CordovaPlugin implements CameraActivity.Camer
   private void setScreenRotation(int screenRotation, CallbackContext callbackContext) {
 
     this.screenRotation = screenRotation;
+    if (overlayOrientationChangeWithScreen) {
+      setOverlayOrientation(screenRotation == 0 ? "portrait" : "landscape");
+    }
 
     if (fragment != null && fragment.getCamera() != null) {
       setCameraRotation();
