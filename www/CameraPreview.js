@@ -32,8 +32,24 @@ CameraPreview.startCamera = function (options, onSuccess, onError) {
   }
   options.disableExifHeaderStripping = options.disableExifHeaderStripping || false;
   options.businessCardOverlay = options.businessCardOverlay || false;
+  options.overlayOrientationChangeWithScreen = options.overlayOrientationChangeWithScreen || false;
   options.blurDetection = options.blurDetection || false;
-  exec(onSuccess, onError, PLUGIN_NAME, "startCamera", [options.x, options.y, options.width, options.height, options.camera, options.tapPhoto, options.previewDrag, options.toBack, options.alpha, options.tapFocus, options.disableExifHeaderStripping, options.businessCardOverlay, options.blurDetection]);
+  exec(onSuccess, onError, PLUGIN_NAME, "startCamera", [
+    options.x,
+    options.y,
+    options.width, 
+    options.height,
+    options.camera,
+    options.tapPhoto,
+    options.previewDrag,
+    options.toBack,
+    options.alpha,
+    options.tapFocus,
+    options.disableExifHeaderStripping,
+    options.businessCardOverlay,
+    options.overlayOrientationChangeWithScreen,
+    options.blurDetection
+  ]);
 };
 
 CameraPreview.stopCamera = function (onSuccess, onError) {
@@ -50,6 +66,10 @@ CameraPreview.hide = function (onSuccess, onError) {
 
 CameraPreview.show = function (onSuccess, onError) {
   exec(onSuccess, onError, PLUGIN_NAME, "showCamera", []);
+};
+
+CameraPreview.setOverlayOrientation = function (orientation, onSuccess, onError) {
+  exec(onSuccess, onError, PLUGIN_NAME, "setOverlayOrientation", [orientation]);
 };
 
 CameraPreview.takePicture = function (opts, onSuccess, onError) {

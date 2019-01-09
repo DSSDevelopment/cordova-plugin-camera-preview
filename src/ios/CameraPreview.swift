@@ -1,13 +1,22 @@
 import AVFoundation
 import CoreMotion
 
+enum OverlayOrientation: String {
+  case portrait = "portrait"
+  case landscape = "landscape"
+}
+
 @objc(CameraPreview)
 class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
     var sessionManager: CameraSessionManager!
     var cameraRenderController: CameraRenderController!
     var onPictureTakenHandlerId = ""
     var captureVideoOrientation: AVCaptureVideoOrientation?
+    var overlayOrientation: OverlayOrientation?
     var blurDetector: BlurDetector?
+    var businessCardOverlayView: UIImageView?
+    var overlayImages: [OverlayOrientation: UIImage]?
+    var overlayOrientationChangeWithScreen = false
     
     override func pluginInitialize() {
         // start as transparent
@@ -28,7 +37,8 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
     // 9 options.tapFocus,
     // 10 options.disableExifHeaderStripping,
     // 11 options.businessCardOverlay,
-    // 12 options.blurDetection
+    // 12 options.overlayOrientationChangeWithScreen,
+    // 13 options.blurDetection
     func startCamera(_ command: CDVInvokedUrlCommand) {
         print("--> startCamera")
         
@@ -65,7 +75,8 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
             let tapToFocus: Bool = (command.arguments[9] as? Int)! != 0
             let disableExifHeaderStripping: Bool = (command.arguments[10] as? Int)! != 0
             let businessCardOverlay: Bool = (command.arguments[11] as? Int)! != 0
-            let blurDetection: Bool = (command.arguments[12] as? Int)! != 0
+            let overlayOrientationChangeWithScreen: Bool = (command.arguments[12] as? Int) != 0
+            let blurDetection: Bool = (command.arguments[13] as? Int)! != 0
             
             DispatchQueue.main.async {
                 let x = (command.arguments[0] as? CGFloat ?? 0.0) + self.webView.frame.origin.x
@@ -107,18 +118,13 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
                 }
 
                 if businessCardOverlay {
-                  // add a view containing the business card overlay to the hierarchy on top of the video preview layer
-                  let margin: CGFloat = 40.0
-                  let height = self.cameraRenderController.view.frame.size.height - margin
-                  let overlayFrame: CGRect = CGRect(x: margin / 2, y: margin / 2.0, width: self.cameraRenderController.view.frame.size.width - margin, height: height)
-                  let businessCardOverlayView = UIImageView(frame: overlayFrame)
-                  businessCardOverlayView.contentMode = .scaleAspectFit
-                  businessCardOverlayView.isOpaque = false
-                  businessCardOverlayView.backgroundColor = .clear
-                  if let image = UIImage(named: "bc-template-1-7.png") {
-                    businessCardOverlayView.image = image
-                    self.webView.superview?.insertSubview(businessCardOverlayView, aboveSubview: self.cameraRenderController.view)
+                  if let portraitImage = UIImage(named: "bc-template-1-7.png"), let landscapeImage = UIImage(named: "bc-template-1-7-landscape.png") {
+                    self.overlayImages = [
+                      .portrait: portraitImage,
+                      .landscape: landscapeImage
+                    ]
                   }
+                 self.createBusinessCardOverlay()
                 }
                 
                 // Setup session
@@ -131,6 +137,45 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
             }
             
         })
+    }
+
+    func createBusinessCardOverlay() {
+      // add a view containing the business card overlay to the hierarchy on top of the video preview layer
+      businessCardOverlayView = UIImageView(frame: .zero)
+      businessCardOverlayView?.isOpaque = false
+      businessCardOverlayView?.backgroundColor = .clear
+      businessCardOverlayView?.image = overlayImages?[.portrait]
+      self.webView.superview?.insertSubview(businessCardOverlayView!, aboveSubview: self.cameraRenderController.view)
+      _setOverlayOrientation(.portrait)
+    }
+
+    func setOverlayOrientation(_ command: CDVInvokedUrlCommand) {
+      print("--> setOverlayOrientation")
+      if let orientationString = command.arguments[0] as? String, let orientation = OverlayOrientation(rawValue: orientationString) {
+        _setOverlayOrientation(orientation)
+        let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: orientationString)
+        commandDelegate.send(pluginResult, callbackId: command.callbackId)
+      } else {
+        let pluginResult = CDVPluginResult(status: CDVCommandStatus_ERROR, messageAs: "invalid OverlayOrientation. Allowed values are \"portrait\" and \"landscape\"." )
+         commandDelegate.send(pluginResult, callbackId: command.callbackId)
+      }
+    }
+
+    func _setOverlayOrientation(_ orientation: OverlayOrientation) {
+      let margin: CGFloat = 40.0
+      let aspectRatio: CGFloat = 9.0 / 16.0
+      var height = self.cameraRenderController.view.frame.size.height - margin
+      var overlayFrame = CGRect(x: margin / 2, y: margin / 2.0, width: self.cameraRenderController.view.frame.size.width - margin, height: height)
+      businessCardOverlayView?.contentMode = .scaleAspectFit
+      businessCardOverlayView?.image = overlayImages?[.portrait]
+      if orientation == .landscape {
+        businessCardOverlayView?.image = overlayImages?[.landscape]
+        businessCardOverlayView?.contentMode = .scaleToFill
+        let width = self.cameraRenderController.view.frame.size.width - margin
+        height = width * aspectRatio
+        overlayFrame = CGRect(x: margin / 2, y: self.cameraRenderController.view.frame.midY - (height / 2.0), width: width, height: height)
+      }
+      businessCardOverlayView?.frame = overlayFrame
     }
     
     func checkDeviceAuthorizationStatus(_ completion: @escaping (_ granted: Bool) -> Void) {
@@ -630,14 +675,19 @@ class CameraPreview: CDVPlugin, TakePictureDelegate, FocusDelegate {
         switch rotationAngle {
             case 0:
                 self.captureVideoOrientation = .portrait
+                if self.overlayOrientationChangeWithScreen { self._setOverlayOrientation(.portrait) }
             case 90:
                 self.captureVideoOrientation = .landscapeRight
+                if self.overlayOrientationChangeWithScreen { self._setOverlayOrientation(.landscape) }
             case 180:
                 self.captureVideoOrientation = .portraitUpsideDown
+                if self.overlayOrientationChangeWithScreen { self._setOverlayOrientation(.portrait) }
             case 270:
                 self.captureVideoOrientation = .landscapeLeft
+                if self.overlayOrientationChangeWithScreen { self._setOverlayOrientation(.landscape) }
             default:
                 self.captureVideoOrientation = .portrait
+                if self.overlayOrientationChangeWithScreen { self._setOverlayOrientation(.portrait) }
         }
     }
     
