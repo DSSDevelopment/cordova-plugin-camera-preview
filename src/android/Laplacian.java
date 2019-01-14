@@ -54,7 +54,7 @@ public class Laplacian extends AsyncTask<Laplacian.LaplacianParams, Void, Double
               int g = (pixel >>  8) & 0xff;
               int b = pixel & 0xff;
               double brightness = Math.floor(0.35 * (double)r + 0.5 * (double)g + 0.15 * (double)b);
-              accumulator += (brightness / 255.0) * lapMatrix[i][j];
+              accumulator += brightness * lapMatrix[i][j];
             }
           }
           sum += accumulator;
@@ -63,12 +63,12 @@ public class Laplacian extends AsyncTask<Laplacian.LaplacianParams, Void, Double
       }
     }
     Double average = sum == 0.0 ? 1.0 : sum / values.size();
-    Double variance = 0.0;
+    Double varianceSum = 0.0;
     Iterator<Double> valuesIterator = values.iterator();
     while(valuesIterator.hasNext()) {
-      variance += Math.pow((valuesIterator.next() - average), 2.0d);
+      varianceSum += Math.pow((valuesIterator.next() - average), 2.0d);
     }
-    return variance * 10.0;
+    return varianceSum / valuesIterator.size();
   }
 
   public static class LaplacianParams {
