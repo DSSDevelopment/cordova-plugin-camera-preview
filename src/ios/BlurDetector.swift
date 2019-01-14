@@ -107,9 +107,6 @@ class BlurDetector: NSObject {
       var r: CGFloat = 0.0
       var g: CGFloat = 0.0
       var b: CGFloat = 0.0
-      var a: CGFloat = 0.0
-      var grayscale: CGFloat = 0.0
-      var alpha: CGFloat = 0.0
       var pos: CGPoint = CGPoint.zero
       var pixelInfo = 0
 
@@ -122,11 +119,10 @@ class BlurDetector: NSObject {
               for j in 0..<3 {
                 pos = CGPoint(x: x+i-1, y: y+j-1)
                 pixelInfo = ((Int(image.size.width) * Int(pos.y)) + Int(pos.x)) * 4
-                r = CGFloat(rawImageData[pixelInfo]) / CGFloat(255.0)
-                g = CGFloat(rawImageData[pixelInfo+1]) / CGFloat(255.0)
-                b = CGFloat(rawImageData[pixelInfo+2]) / CGFloat(255.0)
-                a = CGFloat(rawImageData[pixelInfo+3]) / CGFloat(255.0)
-                UIColor(red: r, green: g, blue: b, alpha: a).getWhite(&grayscale, alpha: &alpha)
+                r = CGFloat(rawImageData[pixelInfo])
+                g = CGFloat(rawImageData[pixelInfo+1])
+                b = CGFloat(rawImageData[pixelInfo+2])
+                let grayscale: CGFloat = floor(0.35 * r + 0.5 * g + 0.15 * b)
                 accumulator += grayscale * lapMatrix[i][j]
               }
             }
@@ -136,13 +132,8 @@ class BlurDetector: NSObject {
         }
       }
       let average: Float = Float(sum == 0 ? 1 : sum) / Float(values.count)
-      let variance = values.reduce(CGFloat(0.0), {acc, val in acc + pow((val - CGFloat(average)), 2)})
+      let varianceSum = values.reduce(CGFloat(0.0), {acc, val in acc + pow((val - CGFloat(average)), 2)})
+      let variance = varianceSum / CGFloat(values.count)
       completion(variance)
-    }
-    
-    private func perceptualBrightness(image: UIImage, point: CGPoint) -> CGFloat {
-      let colorComponents = image.getPixelColor(pos: point).rgbComponents()
-      let perceptualBrightness: CGFloat = floor(0.35 * colorComponents.0 + 0.5 * colorComponents.1 + 0.15 * colorComponents.2)
-      return perceptualBrightness
     }
 }
